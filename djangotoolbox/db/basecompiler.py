@@ -191,29 +191,13 @@ class NonrelQuery(object):
 
         # TODO: Call get_db_prep_lookup directly, constraint.process
         #       doesn't do much more.
-        constraint, lookup_type, annotation, value = child
-        packed, value = constraint.process(lookup_type, value, self.connection)
-        alias, column, db_type = packed
-        field = constraint.field
+        field = child.lhs.source.column
+        if child.lookup_name == 'exact':
+            lookup_type = 'eq'
+        else:
+            lookup_type = child.lookup_name
 
-        opts = self.query.model._meta
-        if alias and alias != opts.db_table:
-            raise DatabaseError("This database doesn't support JOINs "
-                                "and multi-table inheritance.")
-
-        # For parent.child_set queries the field held by the constraint
-        # is the parent's primary key, while the field the filter
-        # should consider is the child's foreign key field.
-        if column != field.column:
-            if not field.primary_key:
-                raise DatabaseError("This database doesn't support filtering "
-                                    "on non-primary key ForeignKey fields.")
-
-            field = (f for f in opts.fields if f.column == column).next()
-            assert field.rel is not None
-
-        value = self._normalize_lookup_value(
-            lookup_type, value, field, annotation)
+        value = child.rhs
 
         return field, lookup_type, value
 
